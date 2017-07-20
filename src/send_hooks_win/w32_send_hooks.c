@@ -94,7 +94,7 @@
 #include "pbs_ecl.h"
 #include  "pbs_nodes.h"
 #include "hook_func.h"
-
+#include "pbs_sched.h"
 
 /* Global Data Items */
 char		*path_hooks = NULL;
@@ -126,7 +126,7 @@ unsigned int	pbs_scheduler_port = 0;
 struct python_interpreter_data  svr_interp_data;
 
 struct server	server;		/* the server structure */
-struct sched	scheduler;	/* the sched structure */
+struct pbs_sched	scheduler;	/* the sched structure */
 char	        server_host[PBS_MAXHOSTNAME+1];	/* host_name  */
 char	        primary_host[PBS_MAXHOSTNAME+1]; /* host_name of primary */
 int		shutdown_who;		/* see req_shutdown() */

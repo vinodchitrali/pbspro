@@ -94,6 +94,7 @@
 #include "pbs_client_thread.h"
 #include "pbs_ecl.h"
 #include "pbs_db.h"
+#include "pbs_sched.h"
 
 #define RETRY 3
 /* External functions called */
@@ -135,7 +136,7 @@ unsigned int	pbs_scheduler_port = 0;
 pbs_net_t	pbs_server_addr = 0;
 unsigned int	pbs_server_port_dis = 0;
 struct server	server;		/* the server structure */
-struct sched	scheduler;	/* the sched structure */
+struct pbs_sched	scheduler;	/* the sched structure */
 char	        server_host[PBS_MAXHOSTNAME+1];	/* host_name  */
 char	        primary_host[PBS_MAXHOSTNAME+1]; /* host_name of primary */
 int		shutdown_who;		/* see req_shutdown() */
