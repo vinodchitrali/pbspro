@@ -164,7 +164,6 @@ extern	int	svr_chngNodesfile;
 extern  pbs_list_head svr_requests;
 extern char     *msg_err_malloc;
 extern int       pbs_failover_active;
-extern int	scheduler_sock, scheduler_sock2;
 
 /* Local Private Functions */
 
@@ -270,15 +269,13 @@ char	       *pbs_server_id;
 int		reap_child_flag = 0;
 time_t		secondary_delay = 30;
 struct server	server;		/* the server structure */
-pbs_sched	*dflt_scheduler;	/* the default scheduler */
+pbs_sched	*dflt_scheduler = NULL;	/* the default scheduler */
 char	        primary_host[PBS_MAXHOSTNAME+1];   /* host_name of primary */
 int		shutdown_who;		/* see req_shutdown() */
 char	       *mom_host = server_host;
 long		new_log_event_mask = 0;
 int		server_init_type = RECOV_WARM;
 int		svr_delay_entry = 0;
-int		svr_do_schedule = SCH_SCHEDULE_NULL;
-int		svr_do_sched_high = SCH_SCHEDULE_NULL; /* high priority cmds */
 int		svr_ping_rate = 300;	/* time between sets of node pings */
 pbs_list_head	svr_deferred_req;
 pbs_list_head	svr_queues;            /* list of queues                   */
@@ -2040,21 +2037,21 @@ try_db_again:
 			/* if time or event says to run scheduler, do it */
 
 			/* if we have a high prio sched command, send it 1st */
-			if (svr_do_sched_high != SCH_SCHEDULE_NULL)
+			if (dflt_scheduler->svr_do_sched_high != SCH_SCHEDULE_NULL)
 				schedule_high();
 
 
-			if (svr_do_schedule == SCH_SCHEDULE_RESTART_CYCLE) {
+			if (dflt_scheduler->svr_do_schedule == SCH_SCHEDULE_RESTART_CYCLE) {
 
 				/* send only to existing connection */
 				/* since it is for interrupting current */
 				/* cycle */
 				/* NOTE: both primary and secondary scheduler */
 				/* connect must have been setup to be valid */
-				if ((scheduler_sock2 != -1) &&
-					(scheduler_sock != -1)) {
-					if (put_sched_cmd(scheduler_sock2,
-						svr_do_schedule, NULL) == 0) {
+				if ((dflt_scheduler->scheduler_sock2 != -1) &&
+					(dflt_scheduler->scheduler_sock != -1)) {
+					if (put_sched_cmd(dflt_scheduler->scheduler_sock2,
+							dflt_scheduler->svr_do_schedule, NULL) == 0) {
 						log_event(PBSEVENT_DEBUG2,
 							PBS_EVENTCLASS_SERVER,
 							LOG_NOTICE, msg_daemonname,
@@ -2066,8 +2063,8 @@ try_db_again:
 						LOG_NOTICE, msg_daemonname,
 						"no valid secondary connection to scheduler: restart scheduling cycle request ignored");
 				}
-				svr_do_schedule = SCH_SCHEDULE_NULL;
-			} else if (((svr_unsent_qrun_req) || ((svr_do_schedule != SCH_SCHEDULE_NULL) &&
+				dflt_scheduler->svr_do_schedule = SCH_SCHEDULE_NULL;
+			} else if (((svr_unsent_qrun_req) || ((dflt_scheduler->svr_do_schedule != SCH_SCHEDULE_NULL) &&
 				server.sv_attr[(int)SRV_ATR_scheduling].at_val.at_long))
 				&& can_schedule()) {
 				/*

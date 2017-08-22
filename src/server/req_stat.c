@@ -118,7 +118,7 @@ static int bad;
 
 /* The following private support functions are included */
 
-static int  status_que(pbs_queue *, struct batch_request *, pbs_list_head *);
+static int  status_que(pbs_queue *, struct batch_request *, pbs_list_head *, attribute *attr);
 static int status_node(struct pbsnode *, struct batch_request *, pbs_list_head *);
 static int status_resv(resc_resv *, struct batch_request *, pbs_list_head *);
 extern pbs_sched *find_scheduler(char *sched_name);
@@ -442,14 +442,35 @@ req_stat_que(struct batch_request *preq)
 	preply->brp_choice = BATCH_REPLY_CHOICE_Status;
 	CLEAR_HEAD(preply->brp_un.brp_status);
 
+	attribute attr;
+	if (preq->rq_extend != NULL) {
+		/*if (!strncmp(preq->rq_extend, ATTR_partition, strlen(ATTR_partition))) {
+			parts = preq->rq_extend + strlen(ATTR_partition) + 1;
+			que_attr_def[QA_ATR_partition].at_decode(&attr, ATTR_partition,
+					parts, NULL);
+		} else {
+			req_reject(rc, bad, preq);
+		}*/
+		rc = que_attr_def[QA_ATR_partition].at_decode(&attr, ATTR_partition,
+				preq->rq_extend, NULL);
+
+		if (rc) {
+			(void) reply_free(preply);
+			req_reject(rc, bad, preq);
+			return;
+		}
+	}
+
 	if (type == 0) {	/* get status of the one named queue */
-		rc = status_que(pque, preq, &preply->brp_un.brp_status);
+		rc = status_que(pque, preq, &preply->brp_un.brp_status,
+				(preq->rq_extend ? &attr : NULL));
 
 	} else {	/* get status of queues */
 
 		pque = (pbs_queue *)GET_NEXT(svr_queues);
 		while (pque) {
-			rc = status_que(pque, preq, &preply->brp_un.brp_status);
+			rc = status_que(pque, preq, &preply->brp_un.brp_status,
+					(preq->rq_extend ? &attr : NULL));
 			if (rc != 0) {
 				if (rc == PBSE_PERM)
 					rc = 0;
@@ -481,15 +502,35 @@ req_stat_que(struct batch_request *preq)
  */
 
 static int
-status_que(pbs_queue *pque, struct batch_request *preq, pbs_list_head *pstathd)
+status_que(pbs_queue *pque, struct batch_request *preq, pbs_list_head *pstathd, attribute *attr)
 {
 	struct brp_status *pstat;
 	svrattrl	  *pal;
-
+	int k;
+	int found = 0;
 	if ((preq->rq_perm & ATR_DFLAG_RDACC) == 0)
 		return (PBSE_PERM);
 
 	/* ok going to do status, update count and state counts from qu_qs */
+
+	if (attr) {
+		if (pque->qu_attr[QA_ATR_partition].at_flags & ATR_VFLAG_SET) {
+			/*search for the partition in the attr*/
+			for (k = 0; k < attr->at_val.at_arst->as_usedptr; k++) {
+				if ((attr->at_val.at_arst->as_string[k] != NULL)
+						&& (!strcmp(
+								pque->qu_attr[QA_ATR_partition].at_val.at_str,
+								attr->at_val.at_arst->as_string[k]))) {
+					found = 1;
+					break;
+				}
+
+			}
+		}
+		if (!found) {
+			return -1;
+		}
+	}
 
 	if (!svr_chk_history_conf()) {
 		pque->qu_attr[(int)QA_ATR_TotalJobs].at_val.at_long = pque->qu_numjobs;

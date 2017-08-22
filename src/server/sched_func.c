@@ -46,6 +46,7 @@
 #include <string.h>
 #include <memory.h>
 #include <pbs_config.h>
+#include "pbs_share.h"
 #include "pbs_sched.h"
 #include "log.h"
 #include "pbs_ifl.h"
@@ -83,7 +84,10 @@ sched_alloc(char *sched_name)
 	CLEAR_LINK(psched->sc_link);
 	strncpy(psched->sc_name, sched_name, PBS_MAXSCHEDNAME);
 	psched->sc_name[PBS_MAXSCHEDNAME] = '\0';
-
+	psched->svr_do_schedule = SCH_SCHEDULE_NULL;
+	psched->svr_do_sched_high = SCH_SCHEDULE_NULL;
+	psched->scheduler_sock = -1;
+	psched->scheduler_sock2 = -1;
 	append_link(&svr_allscheds, &psched->sc_link, psched);
 
 	/* set the working attributes to "unspecified" */
@@ -359,6 +363,11 @@ set_sched_default(pbs_sched* psched)
 		psched->sch_attr[(int) SCHED_ATR_sched_cycle_len].at_flags =
 				ATR_VFLAG_DEFLT | ATR_VFLAG_SET | ATR_VFLAG_MODCACHE;
 	}
+	if ((psched->sch_attr[(int) SCHED_ATR_scheduling].at_flags & ATR_VFLAG_SET) == 0) {
+		psched->sch_attr[(int) SCHED_ATR_scheduling].at_val.at_long = 1;
+		psched->sch_attr[(int) SCHED_ATR_sched_cycle_len].at_flags =
+				ATR_VFLAG_DEFLT | ATR_VFLAG_SET | ATR_VFLAG_MODCACHE;
+	}
 	if ((psched->sch_attr[(int) SCHED_ATR_sched_state].at_flags & ATR_VFLAG_SET) == 0) {
 		psched->sch_attr[(int) SCHED_ATR_sched_state].at_val.at_str = malloc(SC_STATUS_LEN + 1);
 		if (psched->sch_attr[(int) SCHED_ATR_sched_state].at_val.at_str == NULL)
@@ -376,3 +385,54 @@ set_sched_default(pbs_sched* psched)
 	}
 }
 
+
+/**
+ * @brief
+ * 		action routine for the scheduler's partition attribute
+ *
+ * @param[in]	pattr	-	pointer to attribute structure
+ * @param[in]	pobj	-	not used
+ * @param[in]	actmode	-	action mode
+ *
+ *
+ * @return	error code
+ * @retval	PBSE_NONE	-	Success
+ * @retval	!PBSE_NONE	-	Failure
+ *
+ */
+
+int
+action_sched_partition(attribute *pattr, void *pobj, int actmode)
+{
+	pbs_sched* psched;
+	pbs_sched* pin_sched;
+	attribute *part_attr;
+	int i;
+	int k;
+	if (pobj == dflt_scheduler)
+		return PBSE_OP_NOT_PERMITTED;
+	pin_sched = (pbs_sched*) pobj;
+	if (pin_sched->sch_attr[SCHED_ATR_partition].at_flags & ATR_VFLAG_SET)
+		i = pin_sched->sch_attr[SCHED_ATR_partition].at_val.at_arst->as_usedptr;
+	else
+		i = 0;
+
+	for (; i < pattr->at_val.at_arst->as_usedptr; ++i) {
+		if (pattr->at_val.at_arst->as_string[i] == NULL)
+			continue;
+		psched = (pbs_sched*) GET_NEXT(svr_allscheds);
+		while (psched) {
+			part_attr = &(psched->sch_attr[SCHED_ATR_partition]);
+			if (part_attr->at_flags & ATR_VFLAG_SET) {
+				for (k = 0; k < part_attr->at_val.at_arst->as_usedptr; k++) {
+					if ((part_attr->at_val.at_arst->as_string[k] != NULL)
+							&& (!strcmp(pattr->at_val.at_arst->as_string[i],
+									part_attr->at_val.at_arst->as_string[k])))
+						return PBSE_PART_ALREADY_USED;
+				}
+			}
+			psched = (pbs_sched*) GET_NEXT(psched->sc_link);
+		}
+	}
+	return PBSE_NONE;
+}

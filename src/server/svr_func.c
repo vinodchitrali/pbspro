@@ -190,8 +190,6 @@
 
 extern struct python_interpreter_data  svr_interp_data;
 
-
-extern int    scheduler_sock;
 extern time_t time_now;
 extern char  *resc_in_err;
 extern char  *msg_daemonname;
@@ -311,7 +309,7 @@ encode_svrstate(attribute *pattr, pbs_list_head *phead, char *atname, char *rsna
 	if (pattr->at_val.at_long == SV_STATE_RUN) {
 		if (server.sv_attr[(int)SRV_ATR_scheduling].at_val.at_long == 0)
 			psname = svr_idle;
-		else if (scheduler_sock != -1)
+		else if (dflt_scheduler->scheduler_sock != -1)
 			psname = svr_sched;
 	}
 
@@ -792,7 +790,7 @@ set_rpp_highwater(attribute *pattr, void *pobj, int actmode)
 void
 set_sched_sock(int s)
 {
-	scheduler_sock = s;
+	dflt_scheduler->scheduler_sock = s;
 	server.sv_attr[(int)SRV_ATR_State].at_flags |= ATR_VFLAG_MODCACHE;
 }
 

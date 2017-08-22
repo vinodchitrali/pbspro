@@ -42,12 +42,10 @@ extern "C" {
 #endif
 
 #include "attribute.h"
+#include "sched_cmds.h"
+
 #define PBS_SCHED_CYCLE_LEN_DEFAULT 1200
 
-/* scheduler-attribute values (state) */
-#define SC_DOWN		"down"
-#define SC_IDLE			"idle"
-#define SC_SCHEDULING	"scheduling"
 #define SC_STATUS_LEN 	10
 
 /*attributes for the server's sched object*/
@@ -80,6 +78,10 @@ extern attribute_def sched_attr_def[];
 typedef struct pbs_sched {
 	pbs_list_link	sc_link;		/* forward/backward links */
 
+	int scheduler_sock;
+	int scheduler_sock2;
+	int svr_do_schedule;
+	int svr_do_sched_high;
 	char sc_name[PBS_MAXSCHEDNAME];
 	/* sched object's attributes  */
 	attribute sch_attr[SCHED_ATR_LAST];

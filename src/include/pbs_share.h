@@ -91,3 +91,9 @@
 
 /* Default scheduler name */
 #define PBS_DFLT_SCHED_NAME "default"
+
+/* scheduler-attribute values (state) */
+#define SC_DOWN			"down"
+#define SC_IDLE			"idle"
+#define SC_SCHEDULING		"scheduling"
+

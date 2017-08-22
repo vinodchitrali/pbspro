@@ -72,6 +72,7 @@ extern struct server server;
 extern pbs_net_t pbs_scheduler_addr;
 extern unsigned int pbs_scheduler_port;
 extern char      server_name[];
+extern struct connection *svr_conn;
 extern int	 svr_do_schedule;
 extern int	 svr_do_sched_high;
 extern char     *msg_sched_called;
@@ -241,15 +242,15 @@ int
 schedule_high()
 {
 	int s;
-	if (scheduler_sock == -1) {
-		if ((s = contact_sched(svr_do_sched_high, NULL)) < 0)
+	if (dflt_scheduler->scheduler_sock == -1) {
+		if ((s = contact_sched(dflt_scheduler->svr_do_sched_high, NULL)) < 0)
 			return (-1);
 		set_sched_sock(s);
-		if (scheduler_sock2 == -1) {
+		if (dflt_scheduler->scheduler_sock2 == -1) {
 			if ((s = contact_sched(SCH_SCHEDULE_NULL, NULL)) >= 0)
-				scheduler_sock2 = s;
+				dflt_scheduler->scheduler_sock2 = s;
 		}
-		svr_do_sched_high = SCH_SCHEDULE_NULL;
+		dflt_scheduler->svr_do_sched_high = SCH_SCHEDULE_NULL;
 		return 0;
 	}
 	return 1;
@@ -283,9 +284,9 @@ schedule_jobs()
 	if (first_time)
 		cmd = SCH_SCHEDULE_FIRST;
 	else
-		cmd = svr_do_schedule;
+		cmd = dflt_scheduler->svr_do_schedule;
 
-	if (scheduler_sock == -1) {
+	if (dflt_scheduler->scheduler_sock == -1) {
 
 		/* are there any qrun requests from manager/operator */
 		/* which haven't been sent,  they take priority      */
@@ -316,11 +317,11 @@ schedule_jobs()
 		else if (pdefr != NULL)
 			pdefr->dr_sent = 1;   /* mark entry as sent to sched */
 		set_sched_sock(s);
-		if (scheduler_sock2 == -1) {
+		if (dflt_scheduler->scheduler_sock2 == -1) {
 			if ((s = contact_sched(SCH_SCHEDULE_NULL, NULL)) >= 0)
-				scheduler_sock2 = s;
+				dflt_scheduler->scheduler_sock2 = s;
 		}
-		svr_do_schedule = SCH_SCHEDULE_NULL;
+		dflt_scheduler->svr_do_schedule = SCH_SCHEDULE_NULL;
 		first_time = 0;
 
 		/* if there are more qrun requests queued up, reset cmd so */
@@ -328,7 +329,7 @@ schedule_jobs()
 		pdefr = GET_NEXT(svr_deferred_req);
 		while (pdefr) {
 			if (pdefr->dr_sent == 0) {
-				svr_do_schedule = SCH_SCHEDULE_AJOB;
+				dflt_scheduler->svr_do_schedule = SCH_SCHEDULE_AJOB;
 				break;
 			}
 			pdefr = (struct deferred_request *)GET_NEXT(pdefr->dr_link);
@@ -458,11 +459,11 @@ set_scheduler_flag(int flag)
 	 *       B) if we ever add a 3rd high prio command, we can lose them
 	 */
 	if (flag == SCH_CONFIGURE || flag == SCH_QUIT) {
-		if (svr_do_sched_high == SCH_QUIT)
+		if (dflt_scheduler->svr_do_sched_high == SCH_QUIT)
 			return; /* keep only SCH_QUIT */
 
-		svr_do_sched_high = flag;
+		dflt_scheduler->svr_do_sched_high = flag;
 	}
 	else
-		svr_do_schedule = flag;
+		dflt_scheduler->svr_do_schedule = flag;
 }

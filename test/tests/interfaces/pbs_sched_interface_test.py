@@ -162,3 +162,70 @@ class TestSchedulerInterface(TestInterfaces):
         self.assertEqual(
             sched.attributes['sched_cycle_length'],
             '00:20:00')
+
+    def test_set_and_unset_sched_partition(self):
+        """
+        Set and unset partitions of scheduler objects.
+        """
+        # Set an attribute of a scheduler object.
+        self.server.manager(MGR_CMD_SET,
+                            SCHED,
+                            {'partition': 'part1'},
+                            id="TestCommonSched",
+                            expect=True)
+
+        self.server.manager(MGR_CMD_SET,
+                            SCHED,
+                            {'partition': (INCR, 'part2')},
+                            id="TestCommonSched")
+
+        self.server.manager(MGR_CMD_LIST,
+                            SCHED,
+                            id="TestCommonSched")
+        sched = None
+        sched = self.server.schedulers['TestCommonSched']
+        self.assertNotEqual(sched, None)
+        self.assertEqual(
+            sched.attributes['partition'],
+            'part1,part2')
+
+        try:
+            self.server.manager(MGR_CMD_SET,
+                                SCHED,
+                                {'partition': (INCR, 'part2')},
+                                id="TestCommonSched")
+        except PbsManagerError, e:
+              self.assertTrue(
+                  'Partition is already associated with other scheduler' in e.msg[0])
+
+        #try to set partition on default scheduler
+        try:
+            self.server.manager(MGR_CMD_SET,
+                                SCHED,
+                                {'partition':  'part2'},
+                                id="default")
+        except PbsManagerError, e:
+              self.assertTrue(
+                  'Operation is not permitted on default scheduler' in e.msg[0])
+
+        self.server.manager(MGR_CMD_UNSET,
+                            SCHED,
+                            'partition',
+                            id="TestCommonSched")
+
+#       Bug in framework
+#       self.server.manager(MGR_CMD_LIST,
+#                             SCHED,
+#                             id="TestCommonSched")
+#         sched = None
+#         sched = self.server.schedulers['TestCommonSched']
+#         self.assertNotEqual(sched, None)
+#         self.assertFalse(
+#             sched.attributes['partition'],
+#             'part1,part2')
+
+
+    def test_default_sched_state(self):
+
+        self.server.manager(MGR_CMD_SET, SERVER, {'scheduling': 'False'})
+        

@@ -140,8 +140,6 @@ extern char *msg_init_substate;
 extern char *msg_manager;
 extern char *msg_stageinfail;
 extern char *msg_job_abort;
-extern int   scheduler_sock;
-extern int   svr_do_schedule;
 extern pbs_list_head svr_deferred_req;
 extern time_t time_now;
 extern int   svr_totnodes;	/* non-zero if using nodes */
@@ -313,7 +311,7 @@ req_runjob(struct batch_request *preq)
 	}
 	
 #ifndef NAS /* localmod 133 */
-	if ((scheduler_sock != -1) && was_job_alteredmoved(parent)) {
+	if ((dflt_scheduler->scheduler_sock != -1) && was_job_alteredmoved(parent)) {
 		int index = find_attr(sched_attr_def, ATTR_throughput_mode, SCHED_ATR_LAST);
 		/* do not blacklist altered/moved jobs when throughput_mode is enabled */
 		if ((index == -1) ||
@@ -404,7 +402,7 @@ req_runjob(struct batch_request *preq)
 
 		/* if runjob request is from the Scheduler, */
 		/* it must have a destination specified     */
-		if (preq->rq_conn == scheduler_sock) {
+		if (preq->rq_conn == dflt_scheduler->scheduler_sock) {
 			sprintf(log_buffer,
 				"runjob request from scheduler with null destination");
 			log_event(PBSEVENT_SYSTEM, PBS_EVENTCLASS_JOB, LOG_INFO,
@@ -1692,7 +1690,7 @@ where_to_runjob(struct batch_request *preq, job *pjob)
 	}
 
 	/* If the request did not come from the scheduler, update the comment. */
-	if (preq->rq_conn != scheduler_sock) {
+	if (preq->rq_conn != dflt_scheduler->scheduler_sock) {
 		char comment[MAXCOMMENTLEN];
 		nspec = pjob->ji_wattr[(int)JOB_ATR_exec_vnode].at_val.at_str;
 		if ((nspec != NULL) && (*nspec != '\0')) {

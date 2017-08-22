@@ -128,6 +128,9 @@ struct	sockaddr_in	saddr;
 sigset_t	allsigs;
 static char    *logfile = (char *)0;
 static char	path_log[_POSIX_PATH_MAX];
+static char sc_name[PBS_MAXSCHEDNAME];
+static char *log_dir = NULL;
+static char *priv_dir = NULL;
 int 		pbs_rm_port;
 
 /* if we received a sigpipe, this probably means the server went away. */
@@ -736,6 +739,66 @@ engage_authentication(struct connect_handle *phandle)
 static	char scheduler_name[PBS_MAXHOSTNAME+1] = "Me";  /*arbitrary string*/
 
 static void
+update_svr_sched_state(char *state)
+{
+
+	struct	attropl	*attribs, *patt;
+	if (connector < 0)
+		return;
+
+	attribs = (struct  attropl *)calloc(1, sizeof(struct attropl));
+	if (attribs == NULL) {
+		sprintf(log_buffer, "can't update scheduler attribs, calloc failed");
+		log_err(-1, __func__, log_buffer);
+		return;
+	}
+	patt = attribs;
+
+	/* Scheduler State*/
+	patt->name = ATTR_sched_state;
+	patt->value = state;
+	patt->next = NULL;
+
+	pbs_manager(connector,
+			MGR_CMD_SET,
+			MGR_OBJ_SCHED,
+			sc_name,
+			attribs,
+			NULL);
+	free(attribs);
+}
+
+#define COPY_ATTR_VALUE(DEST, SRC) \
+	{ \
+		if (DEST) { \
+			free(DEST); \
+		} \
+		DEST = (char*)malloc(sizeof(SRC)); \
+		strncpy(DEST, attr->value, sizeof(SRC)); \
+	}
+extern char *partitions;
+
+static void
+sched_settings_frm_svr(struct batch_status *status)
+{
+	struct attrl *attr;
+	attr = status->attribs;
+
+	while (attr != NULL) {
+		if (attr->name != NULL && attr->value != NULL) {
+			if (!strcmp(attr->name, ATTR_sched_priv)) {
+				COPY_ATTR_VALUE(priv_dir, attr->value);
+			} else if (!strcmp(attr->name, ATTR_sched_log)) {
+				COPY_ATTR_VALUE(log_dir, attr->value);
+			} else if (!strcmp(attr->name, ATTR_partition)) {
+				COPY_ATTR_VALUE(partitions, attr->value);
+			}
+		}
+		attr = attr->next;
+	}
+}
+
+static void
 update_svr_schedobj(int cmd, int alarm_time)
 {
 	char timestr[128];
@@ -744,6 +807,7 @@ update_svr_schedobj(int cmd, int alarm_time)
 
 	int	err;
 	struct	attropl	*attribs, *patt;
+	struct batch_status *ss = NULL;
 
 	/* This command is only sent on restart of the server */
 	if (cmd == SCH_SCHEDULE_FIRST)
@@ -752,6 +816,12 @@ update_svr_schedobj(int cmd, int alarm_time)
 	if (svr_knows_me || cmd == SCH_ERROR || connector < 0)
 		return;
 
+	/* Stat the scheduler to get details of sched */
+	ss = pbs_statsched(connector, sc_name, NULL, NULL);
+	sched_settings_frm_svr(ss);
+	pbs_statfree(ss);
+
+	/* update the sched with new values */
 	attribs = (struct  attropl *)calloc(3, sizeof(struct attropl));
 	if (attribs == NULL) {
 		sprintf(log_buffer, "can't update scheduler attribs, calloc failed");
@@ -776,7 +846,7 @@ update_svr_schedobj(int cmd, int alarm_time)
 
 	err = pbs_manager(connector,
 		MGR_CMD_SET, MGR_OBJ_SCHED,
-		PBS_DFLT_SCHED_NAME, attribs, NULL);
+		sc_name, attribs, NULL);
 	if (err == 0 && svr_knows_me == 0)
 		svr_knows_me = 1;
 
@@ -1046,6 +1116,14 @@ main(int argc, char *argv[])
 				break;
 		}
 	}
+	/* Check whether the sched name is specified in command line args
+	 * If specified then copy the sched name
+	 * */
+	if (argc > optind)
+		strncpy(sc_name, argv[optind], PBS_MAXSCHEDNAME);
+	else
+		strncpy(sc_name, PBS_DFLT_SCHED_NAME, PBS_MAXSCHEDNAME);
+
 	if (errflg) {
 		fprintf(stderr, "usage: %s %s\n", argv[0], usage);
 		fprintf(stderr, "       %s --version\n", argv[0]);
@@ -1445,9 +1523,12 @@ main(int argc, char *argv[])
 			DBPRT(("Scheduler received command %d\n", cmd));
 #endif /* localmod 031 */
 
+			/* state=BUSY/SCHEDULING*/
+			update_svr_sched_state(SC_SCHEDULING);
 			if (schedule(cmd, connector, runjobid)) /* magic happens here */
 				go = 0;
-
+			/* state=IDLE*/
+			update_svr_sched_state(SC_IDLE);
 			if (second_connection != -1) {
 				close(second_connection);
 				second_connection = -1;

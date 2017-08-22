@@ -733,10 +733,11 @@ pbsd_init(int type)
 				printf("%s\n", log_buffer);
 				return -1;
 			}
-			svr_save_db(&server, SVR_SAVE_NEW);
-		} else {
-			svr_save_db(&server, SVR_SAVE_NEW);
 		}
+		svr_save_db(&server, SVR_SAVE_NEW);
+		dflt_scheduler = sched_alloc(PBS_DFLT_SCHED_NAME);
+		(void)sched_save_db(dflt_scheduler, SVR_SAVE_NEW);
+		set_sched_default(dflt_scheduler);
 	}
 
 	/* 4. Check License information */
